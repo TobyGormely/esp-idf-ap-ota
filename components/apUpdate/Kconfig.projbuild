@@ -1,0 +1,11 @@
+menu "AP OTA Update Config"
+    config HOSTNAME_SET
+        string "Webpage Host Name"
+        default "simpleota"
+    config SSID_SET
+        string "AP SSID"
+        default "Simple OTA"
+    config PASSWORD_SET
+        string "AP Password"
+        default "simpleota"
+endmenu
