@@ -18,18 +18,16 @@
 #define OTA_FIRMWARE_UPLOADED 3
 #define OTA_FIRMWARE_DONE 4
 
-extern uint8_t otaInfoBytes[5];
-bool validate_esp32_firmware(const uint8_t* data, size_t len);
-void startAP(char *networkName);
-void apUpdateTask(void *pvParameters);
-void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
-void start_webserver(void);
-void stopAPUpdate(void);
-void init_mdns(const char* hostname);
+void apUpdate_startAP(char *networkName);
+void apUpdate_task(void *pvParameters);
+void apUpdate_wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+void apUpdate_startWebserver(void);
+void apUpdate_stop(void);
+void apUpdate_initMdns(const char* hostname);
 
 // Timeout control functions
-void cancel_ap_timeout(void);
-bool is_ap_timeout_active(void);
+void apUpdate_cancelTimeout(void);
+bool apUpdate_isTimeoutActive(void);
 
 #endif // APUPDATE_H 
 

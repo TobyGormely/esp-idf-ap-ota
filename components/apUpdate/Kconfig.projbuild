@@ -1,11 +1,45 @@
-menu "AP OTA Update Config"
-    config HOSTNAME_SET
-        string "Webpage Host Name"
-        default "simpleota"
-    config SSID_SET
-        string "AP SSID"
+menu "Simple OTA Configuration"
+    config SIMPLE_OTA_AP_SSID
+        string "Access Point SSID"
         default "Simple OTA"
-    config PASSWORD_SET
-        string "AP Password"
+        help
+            The WiFi network name that will be created for OTA updates.
+            Users connect to this network to upload firmware.
+
+    config SIMPLE_OTA_AP_PASSWORD
+        string "Access Point Password"
         default "simpleota"
+        help
+            Password for the OTA access point. Must be at least 8 characters
+            for WPA2 security. Leave empty for open network (not recommended).
+
+    config SIMPLE_OTA_HOSTNAME
+        string "mDNS Hostname"
+        default "simple-ota"
+        help
+            Hostname for mDNS service. Device will be accessible at
+            http://hostname.local (e.g., http://simple-ota.local)
+
+    config SIMPLE_OTA_TIMEOUT_MINUTES
+        int "Auto-shutdown timeout (minutes)"
+        default 0
+        range 0 1440
+        help
+            Automatically shut down OTA after this many minutes of inactivity.
+            Set to 0 to disable timeout. Maximum 24 hours (1440 minutes).
+
+    config SIMPLE_OTA_AUTO_REBOOT
+        bool "Auto-reboot after successful update"
+        default y
+        help
+            Automatically reboot the device after a successful firmware update.
+            Disable this if you need to perform cleanup before rebooting.
+
+    config SIMPLE_OTA_MAX_FILE_SIZE_MB
+        int "Maximum firmware file size (MB)"
+        default 2
+        range 1 16
+        help
+            Maximum size of firmware files that can be uploaded.
+            Larger files will be rejected to prevent memory issues.
 endmenu

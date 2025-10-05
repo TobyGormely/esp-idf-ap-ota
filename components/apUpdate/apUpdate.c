@@ -1,4 +1,5 @@
 #include "apUpdate.h"
+#include "otaHandler.h"
 
 #include "esp_ota_ops.h"
 #include "esp_err.h"
@@ -31,7 +32,7 @@ static void ap_timeout_task(void *pvParameters)
     if (ap_timeout_active)
     {
         ESP_LOGW("AP_TIMEOUT", "AP timeout reached (%d minutes). Automatically shutting down AP update mode", AP_TIMEOUT_MINUTES);
-        stopAPUpdate();
+        apUpdate_stop();
         ap_timeout_active = false;
         timeout_task_handle = NULL;
     }
@@ -39,62 +40,62 @@ static void ap_timeout_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void apUpdateTask(void *pvParameters)
+void apUpdate_task(void *pvParameters)
 {
-    startAP(CONFIG_SSID_SET);
+    apUpdate_startAP(CONFIG_SIMPLE_OTA_AP_SSID);
     vTaskDelay(pdMS_TO_TICKS(1000));
-    init_mdns(NULL); // Use default hostname from CONFIG_HOSTNAME_SET
-    start_webserver();
+    apUpdate_initMdns(CONFIG_SIMPLE_OTA_HOSTNAME);
+    apUpdate_startWebserver();
 
-    // NO TIMEOUT FOR NOW
-    //   ap_timeout_active = true;
-    //   BaseType_t xReturned = xTaskCreate(
-    //       ap_timeout_task,
-    //       "ap_timeout",
-    //       4096,  // Stack size
-    //       NULL,  // Parameters
-    //       1,     // Priority
-    //       &timeout_task_handle
-    //   );
-    //
-    //   if (xReturned == pdPASS) {
-    //       ESP_LOGI("AP_TIMEOUT", "Timeout task created successfully. AP will auto-shutdown in %d minutes", AP_TIMEOUT_MINUTES);
-    //   } else {
-    //       ESP_LOGE("AP_TIMEOUT", "Failed to create timeout task");
-    //   }
+    ap_timeout_active = true;
+    BaseType_t xReturned = xTaskCreate(
+        ap_timeout_task,
+        "ap_timeout",
+        4096, // Stack size
+        NULL, // Parameters
+        1,    // Priority
+        &timeout_task_handle);
+
+    if (xReturned == pdPASS)
+    {
+        ESP_LOGI("AP_TIMEOUT", "Timeout task created successfully. AP will auto-shutdown in %d minutes", AP_TIMEOUT_MINUTES);
+    }
+    else
+    {
+        ESP_LOGE("AP_TIMEOUT", "Failed to create timeout task");
+    }
 
     vTaskDelete(NULL);
 }
 
-void init_mdns(const char *hostname)
+void apUpdate_initMdns(const char *hostname)
 {
-    static bool mdns_initialized = false;
-    
-    const char *mdns_hostname = hostname ? hostname : CONFIG_HOSTNAME_SET;
+    static bool mdns_initialised = false;
 
-    if (mdns_initialized)
+    const char *mdns_hostname = hostname ? hostname : CONFIG_SIMPLE_OTA_HOSTNAME;
+
+    if (mdns_initialised)
     {
-        ESP_LOGI("MDNS", "mDNS already initialized, updating hostname to: %s", mdns_hostname);
+        ESP_LOGI("MDNS", "mDNS already initialised, updating hostname to: %s", mdns_hostname);
         ESP_ERROR_CHECK(mdns_hostname_set(mdns_hostname));
         ESP_ERROR_CHECK(mdns_instance_name_set(mdns_hostname));
         return;
     }
 
-    ESP_LOGI("MDNS", "Initializing mDNS with hostname: %s", mdns_hostname);
+    ESP_LOGI("MDNS", "Initialising mDNS with hostname: %s", mdns_hostname);
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set(mdns_hostname));
     ESP_ERROR_CHECK(mdns_instance_name_set(mdns_hostname));
 
     mdns_txt_item_t serviceTxtData[1] = {
-        {"path", "/"}
-    };
+        {"path", "/"}};
     ESP_ERROR_CHECK(mdns_service_add(NULL, "_http", "_tcp", 80, serviceTxtData, 1));
 
-    mdns_initialized = true;
+    mdns_initialised = true;
     ESP_LOGI("MDNS", "mDNS service started successfully with hostname: %s.local", mdns_hostname);
 }
 
-void startAP(char *networkName)
+void apUpdate_startAP(char *networkName)
 {
     esp_err_t ret = esp_event_loop_create_default();
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE)
@@ -139,7 +140,7 @@ void startAP(char *networkName)
 
     if (wifi_event_handler_instance == NULL)
     {
-        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL, &wifi_event_handler_instance);
+        esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &apUpdate_wifiEventHandler, NULL, &wifi_event_handler_instance);
     }
 
     wifi_config_t wifi_config = {
@@ -151,9 +152,10 @@ void startAP(char *networkName)
     };
 
     strcpy((char *)wifi_config.ap.ssid, networkName);
-    strcpy((char *)wifi_config.ap.password, CONFIG_PASSWORD_SET);
-    
-    if (strlen(CONFIG_PASSWORD_SET) > 0) {
+    strcpy((char *)wifi_config.ap.password, CONFIG_SIMPLE_OTA_AP_PASSWORD);
+
+    if (strlen(CONFIG_SIMPLE_OTA_AP_PASSWORD) > 0)
+    {
         wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
     }
 
@@ -161,171 +163,10 @@ void startAP(char *networkName)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI("wifiAP", "Wi-Fi initialized in SoftAP mode");
+    ESP_LOGI("wifiAP", "Wi-Fi initialised in SoftAP mode");
 }
 
-bool validate_esp32_firmware(const uint8_t *data, size_t len)
-{
-    if (len < 32)
-        return false;
-
-    // Check for ESP32 firmware magic bytes (0xE9)
-    if (data[0] != 0xE9)
-    {
-        ESP_LOGE("OTA", "Invalid firmware magic byte: 0x%02x", data[0]);
-        return false;
-    }
-
-    ESP_LOGI("OTA", "Firmware header validation passed");
-    return true;
-}
-
-esp_err_t ota_update_post_handler(httpd_req_t *req)
-{
-    esp_ota_handle_t ota_handle = 0;
-    const esp_partition_t *ota_partition = esp_ota_get_next_update_partition(NULL);
-    const esp_partition_t *running_partition = esp_ota_get_running_partition();
-    esp_err_t err = ESP_OK;
-    bool ota_started = false;
-
-    if (!ota_partition)
-    {
-        ESP_LOGE("OTA", "No OTA partition found");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition available");
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI("OTA", "Starting OTA update. Running partition: %s, Target partition: %s",
-             running_partition->label, ota_partition->label);
-
-    // Begin OTA update
-    err = esp_ota_begin(ota_partition, OTA_SIZE_UNKNOWN, &ota_handle);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE("OTA", "esp_ota_begin failed, error=%d", err);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA initialization failed");
-        return ESP_FAIL;
-    }
-    ota_started = true;
-
-    char buffer[512];
-    int received;
-    int total_received = 0;
-    bool first_chunk = true;
-    bool firmware_validated = false;
-
-    // Receive firmware data in chunks
-    while ((received = httpd_req_recv(req, buffer, sizeof(buffer))) > 0)
-    {
-        if (first_chunk)
-        {
-            // Validate firmware header on first chunk
-            if (!validate_esp32_firmware((uint8_t *)buffer, received))
-            {
-                ESP_LOGE("OTA", "Invalid firmware format");
-                if (ota_started)
-                    esp_ota_abort(ota_handle);
-                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid firmware format");
-                return ESP_FAIL;
-            }
-            firmware_validated = true;
-
-            // Log the first 10 bytes for debugging
-            ESP_LOGI("OTA", "First 10 bytes: %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
-                     buffer[0], buffer[1], buffer[2], buffer[3], buffer[4],
-                     buffer[5], buffer[6], buffer[7], buffer[8], buffer[9]);
-
-            first_chunk = false;
-        }
-
-        // Write to the OTA partition
-        err = esp_ota_write(ota_handle, (const void *)buffer, received);
-        if (err != ESP_OK)
-        {
-            ESP_LOGE("OTA", "OTA Write Failed at offset %d, error=%d", total_received, err);
-            if (ota_started)
-                esp_ota_abort(ota_handle);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Firmware write failed");
-            return ESP_FAIL;
-        }
-        total_received += received;
-
-        // Log progress every 64KB
-        if (total_received % (64 * 1024) == 0)
-        {
-            ESP_LOGI("OTA", "Received %d bytes", total_received);
-        }
-    }
-
-    if (received < 0)
-    {
-        ESP_LOGE("OTA", "File reception failed! Error: %d", received);
-        if (ota_started)
-            esp_ota_abort(ota_handle);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File reception failed");
-        return ESP_FAIL;
-    }
-
-    if (total_received == 0)
-    {
-        ESP_LOGE("OTA", "No data received");
-        if (ota_started)
-            esp_ota_abort(ota_handle);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No firmware data received");
-        return ESP_FAIL;
-    }
-
-    if (!firmware_validated)
-    {
-        ESP_LOGE("OTA", "Firmware validation failed");
-        if (ota_started)
-            esp_ota_abort(ota_handle);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Firmware validation failed");
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI("OTA", "Total firmware size received: %d bytes", total_received);
-
-    // End OTA update
-    err = esp_ota_end(ota_handle);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE("OTA", "esp_ota_end failed, error=%d", err);
-
-        // Check if this is a signature verification failure
-        if (err == ESP_ERR_OTA_VALIDATE_FAILED)
-        {
-            ESP_LOGE("OTA", "Firmware signature verification failed - unauthorised firmware rejected");
-            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                "Firmware verification failed: This device requires signed firmware. "
-                                "Please upload a firmware file that has been properly signed with the authorised key.");
-        }
-        else
-        {
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA finalisation failed");
-        }
-        return ESP_FAIL;
-    }
-    ota_started = false;
-
-    // Set OTA partition as boot partition
-    err = esp_ota_set_boot_partition(ota_partition);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE("OTA", "OTA set boot partition failed, error=%d", err);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Boot partition update failed");
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI("OTA", "Firmware update successful, rebooting...");
-    httpd_resp_sendstr(req, "Firmware update successful. Rebooting...");
-    vTaskDelay(pdMS_TO_TICKS(2000));
-    esp_restart();
-
-    return ESP_OK;
-}
-
-void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+void apUpdate_wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED)
     {
@@ -384,7 +225,7 @@ esp_err_t redirect_handler(httpd_req_t *req)
 
 static httpd_handle_t server = NULL;
 
-void start_webserver(void)
+void apUpdate_startWebserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
@@ -419,7 +260,7 @@ void start_webserver(void)
     httpd_uri_t uri_ota_update = {
         .uri = "/ota_update",
         .method = HTTP_POST,
-        .handler = ota_update_post_handler,
+        .handler = otaHandler_updatePostHandler,
         .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_ota_update);
 
@@ -473,7 +314,7 @@ void deinit_ap_wifi(void)
     ESP_LOGI("WIFI", "Wi-Fi stopped and cleaned up");
 }
 
-void stopAPUpdate(void)
+void apUpdate_stop(void)
 {
     if (timeout_task_handle != NULL && ap_timeout_active)
     {
@@ -488,11 +329,11 @@ void stopAPUpdate(void)
     deinit_ap_mdns();
     deinit_ap_wifi();
 
-    ESP_LOGI("AP_UPDATE", "All AP Update components deinitialized");
+    ESP_LOGI("AP_UPDATE", "All AP Update components deinitialised");
 }
 
 // Timeout helpers
-void cancel_ap_timeout(void)
+void apUpdate_cancelTimeout(void)
 {
     if (timeout_task_handle != NULL && ap_timeout_active)
     {
@@ -503,7 +344,7 @@ void cancel_ap_timeout(void)
     }
 }
 
-bool is_ap_timeout_active(void)
+bool apUpdate_isTimeoutActive(void)
 {
     return ap_timeout_active;
 }
