@@ -1,0 +1,12 @@
+name: esp32-idf-ap-ota
+version: "1.0.0"
+description: "Simple OTA over AP library for ESP32 with web interface"
+url: https://github.com/TobyGormely/esp-idf-ap-ota
+dependencies:
+  idf: ">=5.0.0"
+  espressif/mdns: "^1.4.1"
+targets:
+  - esp32
+  - esp32s2  
+  - esp32s3
+  - esp32c3
