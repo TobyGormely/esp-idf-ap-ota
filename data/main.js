@@ -1,6 +1,4 @@
 let currentFile = null;
-let retryCount = 0;
-let maxRetries = 3;
 
 function setupDragDrop() {
   const dragDropArea = document.getElementById('dragDropArea');
@@ -62,37 +60,77 @@ function showStatus(msg, type = '') {
   statusElem.className = 'status' + (type ? ' ' + type : '');
 }
 
-function getDetailedErrorMessage(status) {
+function getDetailedErrorMessage(status, responseText) {
+  let serverMessage = '';
+  try {
+    const errorData = JSON.parse(responseText);
+    if (errorData.error) {
+      serverMessage = errorData.error;
+    }
+    if (errorData.details) {
+      serverMessage += '<br><small>' + errorData.details + '</small>';
+    }
+  } catch (e) {
+    if (responseText && responseText.length < 200) {
+      serverMessage = responseText;
+    }
+  }
+  
   switch (status) {
     case 400:
-      return 'Firmware verification failed - This device requires properly signed firmware';
+      return serverMessage || 'Invalid firmware file';
     case 413:
-      return 'File too large (max 2MB)';
+      const maxSizeMB = typeof CONFIG_MAX_FILE_SIZE_MB !== 'undefined' ? CONFIG_MAX_FILE_SIZE_MB : 2;
+      return 'File too large (max ' + maxSizeMB + 'MB)';
     case 500:
-      return 'Server error during upload';
+      return serverMessage || 'Server error during upload';
     case 0:
-      return 'Network connection lost';
+      return 'Connection failed';
+
+    case 503:
+      return 'Device busy';
     default:
-      return 'Upload failed (status: ' + status + ')';
+      return (serverMessage || 'Upload failed') + '<br><small>Error code: ' + status + '</small>';
   }
 }
 
-function showRetryButton() {
-  document.getElementById('retryButton').style.display = 'inline-block';
-}
 
-function hideRetryButton() {
-  document.getElementById('retryButton').style.display = 'none';
-}
 
-function retryUpload() {
-  if (currentFile && retryCount < maxRetries) {
-    retryCount++;
-    uploadFirmware(null, true);
+function validateFile(file) {
+  const errors = [];
+  
+  // Check file existence
+  if (!file) {
+    errors.push('No file selected');
+    return errors;
   }
+  
+  // Check file extension
+  if (!file.name.toLowerCase().endsWith('.bin')) {
+    errors.push('File must have .bin extension');
+  }
+  
+  // Check file size (use configured limit)
+  const maxSizeBytes = (typeof CONFIG_MAX_FILE_SIZE_MB !== 'undefined' ? CONFIG_MAX_FILE_SIZE_MB : 2) * 1024 * 1024;
+  if (file.size > maxSizeBytes) {
+    const maxSizeMB = Math.floor(maxSizeBytes / (1024 * 1024));
+    errors.push('File too large (maximum ' + maxSizeMB + 'MB)');
+  }
+  
+  // Check minimum size 
+  if (file.size < 100 * 1024) {
+    errors.push('File too small (minimum 100KB) - not valid firmware');
+  }
+  
+  // Check file is not empty
+  if (file.size === 0) {
+    errors.push('File is empty');
+  }
+  
+  return errors;
 }
 
-function uploadFirmware(event, isRetry = false) {
+function uploadFirmware(event) {
   if (event) event.preventDefault();
   
   const fileInput = document.querySelector('input[type="file"]');
@@ -101,36 +139,34 @@ function uploadFirmware(event, isRetry = false) {
   const progressFill = document.querySelector('.progress-fill');
   const file = currentFile || fileInput.files[0];
   
-  if (!file) {
-    showStatus('Please select a firmware file', 'error');
+  // Validate file before upload
+  const validationErrors = validateFile(file);
+  if (validationErrors.length > 0) {
+    showStatus(
+      '<strong>File Validation Failed</strong><br>' +
+      validationErrors.join('<br>') +
+      '<br><small>Please select a valid ESP32 firmware .bin file</small>',
+      'error'
+    );
     return;
   }
   
-  if (!isRetry && !confirm('Are you sure you want to update the firmware?')) {
-    return;
-  }
-  
-  if (file.size > 2097152) {
-    showStatus('File too large. Maximum size is 2MB', 'error');
+  if (!confirm(
+    'Are you sure you want to update the firmware?\n\n' +
+    'File: ' + file.name + '\n' +
+    'Size: ' + (file.size / 1024 / 1024).toFixed(2) + ' MB\n\n' +
+    'The device will restart after successful update.'
+  )) {
     return;
   }
   
   submitButton.disabled = true;
-  hideRetryButton();
   progressContainer.style.display = 'block';
   progressFill.style.width = '0%';
   
-  showStatus(
-    isRetry 
-      ? '<span class="spinner"></span>Retrying upload... (Attempt ' + (retryCount + 1) + '/' + (maxRetries + 1) + ')'
-      : '<span class="spinner"></span>Uploading firmware...',
-    'uploading'
-  );
-  
-  if (!isRetry) retryCount = 0;
+  showStatus('<span class="spinner"></span>Uploading firmware...');
   
   const xhr = new XMLHttpRequest();
-  xhr.timeout = 60000;
   xhr.open('POST', '/ota_update', true);
   xhr.setRequestHeader('Content-Type', 'application/octet-stream');
   
@@ -148,51 +184,58 @@ function uploadFirmware(event, isRetry = false) {
   };
   
   xhr.onerror = function() {
-    showStatus('Network error occurred', 'error');
+    showStatus(
+      '<strong>Upload Failed</strong><br>' +
+      'Network error occurred during upload',
+      'error'
+    );
     submitButton.disabled = false;
     progressContainer.style.display = 'none';
-    if (retryCount < maxRetries) showRetryButton();
-  };
-  
-  xhr.ontimeout = function() {
-    showStatus('Upload timed out after 60 seconds', 'error');
-    submitButton.disabled = false;
-    progressContainer.style.display = 'none';
-    if (retryCount < maxRetries) showRetryButton();
+    console.error('XHR Network error during OTA upload');
   };
   
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4) {
       progressContainer.style.display = 'none';
+      
       if (xhr.status === 200) {
-        showStatus('<span class="spinner"></span>Restarting system...', 'uploading');
-        let countdown = 10;
+        // Success - handle restart countdown
+        showStatus('<span class="spinner"></span>Update successful! Restarting system...', 'success');
+        let countdown = 15;
         const restartInterval = setInterval(function() {
-          showStatus(
-            '<span class="spinner"></span>Restarting system... (' + countdown + ' seconds)',
-            'uploading'
-          );
-          countdown--;
-          if (countdown < 0) {
-            clearInterval(restartInterval);
-            document.title = 'Update Complete';
+          if (countdown > 0) {
             showStatus(
-              'Firmware uploaded successfully!<br><strong>System is restarting to apply the update.</strong><br>You can now close this window.',
+              '<span class="spinner"></span>Update successful! System restarting in ' + countdown + ' seconds...<br><small>Please wait for the device to restart</small>',
+              'success'
+            );
+            countdown--;
+          } else {
+            clearInterval(restartInterval);
+            document.title = 'Update Complete - System Restarted';
+            showStatus(
+              '<strong>Firmware update completed successfully!</strong><br>' +
+              'The system has restarted with the new firmware.<br>' +
+              '<small>You can now close this window or disconnect from the WiFi network.</small>',
               'success'
             );
             document.getElementById('uploadForm').style.display = 'none';
-            hideRetryButton();
           }
         }, 1000);
+        
       } else {
-        const errorMsg = getDetailedErrorMessage(xhr.status);
-        showStatus('Upload failed: ' + errorMsg, 'error');
-        if (retryCount < maxRetries) {
-          showRetryButton();
-        } else {
-          showStatus('Upload failed: ' + errorMsg + '<br>Maximum retry attempts reached.', 'error');
-        }
+        // Error handling
+        const errorMsg = getDetailedErrorMessage(xhr.status, xhr.responseText);
+        showStatus('<strong>Upload Failed</strong><br>' + errorMsg, 'error');
+        
+        // Log error for debugging
+        console.error('OTA Upload failed:', {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          responseText: xhr.responseText,
+          file: file ? file.name : 'unknown'
+        });
       }
+      
       submitButton.disabled = false;
     }
   };

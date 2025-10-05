@@ -77,7 +77,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
     if (!ota_partition)
     {
         ESP_LOGE(TAG, "No OTA partition found");
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition available");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, 
+            "{\"error\":\"No OTA partition available\",\"details\":\"Device flash configuration issue\"}");
         return ESP_FAIL;
     }
 
@@ -89,7 +91,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "esp_ota_begin failed, error=%d", err);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA initialisation failed");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, 
+            "{\"error\":\"Failed to start OTA update\",\"details\":\"Device memory or partition issue\"}");
         return ESP_FAIL;
     }
     ota_started = true;
@@ -111,7 +115,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
                 ESP_LOGE(TAG, "Invalid firmware format");
                 if (ota_started)
                     esp_ota_abort(ota_handle);
-                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid firmware format");
+                httpd_resp_set_type(req, "application/json");
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, 
+                    "{\"error\":\"Invalid firmware file\",\"details\":\"File is not a valid ESP32 firmware. Ensure you're uploading a .bin file built for this device.\"}");
                 return ESP_FAIL;
             }
             firmware_validated = true;
@@ -131,7 +137,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
             ESP_LOGE(TAG, "OTA Write Failed at offset %d, error=%d", total_received, err);
             if (ota_started)
                 esp_ota_abort(ota_handle);
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Firmware write failed");
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, 
+                "{\"error\":\"Firmware write failed\",\"details\":\"Flash memory write error\"}");
             return ESP_FAIL;
         }
         total_received += received;
@@ -148,7 +156,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
         ESP_LOGE(TAG, "File reception failed! Error: %d", received);
         if (ota_started)
             esp_ota_abort(ota_handle);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "File reception failed");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, 
+            "{\"error\":\"File reception failed\",\"details\":\"Network error during file upload\"}");
         return ESP_FAIL;
     }
 
@@ -157,7 +167,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
         ESP_LOGE(TAG, "No data received");
         if (ota_started)
             esp_ota_abort(ota_handle);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No firmware data received");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, 
+            "{\"error\":\"No firmware data received\",\"details\":\"Empty file or upload interrupted\"}");
         return ESP_FAIL;
     }
 
@@ -166,7 +178,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
         ESP_LOGE(TAG, "Firmware validation failed");
         if (ota_started)
             esp_ota_abort(ota_handle);
-        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Firmware validation failed");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, 
+            "{\"error\":\"Firmware validation failed\",\"details\":\"File format validation error\"}");
         return ESP_FAIL;
     }
 
@@ -182,13 +196,15 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
         if (err == ESP_ERR_OTA_VALIDATE_FAILED)
         {
             ESP_LOGE(TAG, "Firmware signature verification failed - unauthorised firmware rejected");
+            httpd_resp_set_type(req, "application/json");
             httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
-                                "Firmware verification failed: This device requires signed firmware. "
-                                "Please upload a firmware file that has been properly signed with the authorised key.");
+                                "{\"error\":\"Firmware signature verification failed\",\"details\":\"This device requires signed firmware. Please use firmware built and signed with the authorised key.\"}");
         }
         else
         {
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA finalisation failed");
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, 
+                "{\"error\":\"OTA finalisation failed\",\"details\":\"Internal error during firmware installation\"}");
         }
         return ESP_FAIL;
     }
@@ -199,7 +215,9 @@ esp_err_t otaHandler_updatePostHandler(httpd_req_t *req)
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "OTA set boot partition failed, error=%d", err);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Boot partition update failed");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, 
+            "{\"error\":\"Boot partition update failed\",\"details\":\"Failed to set new firmware as boot partition\"}");
         return ESP_FAIL;
     }
 

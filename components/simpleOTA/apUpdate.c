@@ -209,8 +209,20 @@ esp_err_t css_handler(httpd_req_t *req)
 esp_err_t js_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/javascript");
+    
+    // First send the configuration variable
+    char config_js[128];
+    snprintf(config_js, sizeof(config_js), 
+             "const CONFIG_MAX_FILE_SIZE_MB = %d;\n", 
+             CONFIG_SIMPLE_OTA_MAX_FILE_SIZE_MB);
+    httpd_resp_send_chunk(req, config_js, strlen(config_js));
+    
+    // Then send the main JavaScript file
     const size_t js_size = main_js_end - main_js_start;
-    httpd_resp_send(req, (const char *)main_js_start, js_size);
+    httpd_resp_send_chunk(req, (const char *)main_js_start, js_size);
+    
+    // End the chunked response
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 

@@ -187,19 +187,36 @@ input[type=file]:focus {
   font-size: 14px;
   color: #6c757d;
   min-height: 20px;
+  line-height: 1.4;
 }
 
 .status.success {
   color: #198754;
   font-weight: bold;
+  background: #d1eddd;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #198754;
 }
 
 .status.error {
   color: #dc3545;
   font-weight: bold;
+  background: #f8d7da;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #dc3545;
 }
 
 .status.uploading {
+  font-weight: normal;
+}
+
+.status small {
+  display: block;
+  font-size: 12px;
+  margin-top: 8px;
+  opacity: 0.8;
   font-weight: normal;
 }
 
@@ -219,24 +236,7 @@ input[type=file]:focus {
   margin-right: 8px;
 }
 
-.retry-button {
-  background: linear-gradient(135deg, #fd7e14 0%, #e55a4e 100%);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  margin-top: 15px;
-  display: none;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(253, 126, 20, 0.3);
-}
 
-.retry-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(253, 126, 20, 0.4);
-}
 
 .footer {
   margin-top: 20px;
