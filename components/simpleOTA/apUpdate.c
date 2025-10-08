@@ -8,6 +8,16 @@
 #include <stdio.h>
 #include <string.h>
 
+// External binary data declarations
+extern const uint8_t index_html_start[] asm("_binary_index_html_start");
+extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+extern const uint8_t main_css_start[] asm("_binary_main_css_start");
+extern const uint8_t main_css_end[] asm("_binary_main_css_end");
+extern const uint8_t main_js_start[] asm("_binary_main_js_start");
+extern const uint8_t main_js_end[] asm("_binary_main_js_end");
+extern const uint8_t logo_png_start[] asm("_binary_logo_png_start");
+extern const uint8_t logo_png_end[] asm("_binary_logo_png_end");
+
 uint8_t otaInfoBytes[5] = {OTA_FIRMWARE_DEFAULT, OTA_AP_LAUNCHED, OTA_DEVICE_CONNECTED, OTA_FIRMWARE_UPLOADED, OTA_FIRMWARE_DONE};
 
 // AP state
@@ -243,6 +253,14 @@ esp_err_t redirect_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+esp_err_t logo_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "image/png");
+    const size_t logo_size = logo_png_end - logo_png_start;
+    httpd_resp_send(req, (const char *)logo_png_start, logo_size);
+    return ESP_OK;
+}
+
 static httpd_handle_t server = NULL;
 
 void apUpdate_startWebserver(void)
@@ -283,6 +301,13 @@ void apUpdate_startWebserver(void)
         .handler = otaHandler_updatePostHandler,
         .user_ctx = NULL};
     httpd_register_uri_handler(server, &uri_ota_update);
+
+    httpd_uri_t uri_logo = {
+        .uri = "/logo.png",
+        .method = HTTP_GET,
+        .handler = logo_handler,
+        .user_ctx = NULL};
+    httpd_register_uri_handler(server, &uri_logo);
 
     // Catch-all
     httpd_uri_t uri_redirect = {
