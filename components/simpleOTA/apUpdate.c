@@ -152,11 +152,21 @@ void apUpdate_startAP(char *networkName)
     };
 
     strcpy((char *)wifi_config.ap.ssid, networkName);
-    strcpy((char *)wifi_config.ap.password, CONFIG_SIMPLE_OTA_AP_PASSWORD);
-
-    if (strlen(CONFIG_SIMPLE_OTA_AP_PASSWORD) > 0)
-    {
-        wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+    
+    // Validate password length for WPA2 security
+    size_t password_len = strlen(CONFIG_SIMPLE_OTA_AP_PASSWORD);
+    if (password_len > 0) {
+        if (password_len < 8) {
+            ESP_LOGE("wifiAP", "WiFi password must be at least 8 characters long (current: %d). Using open network instead.", password_len);
+            wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+            wifi_config.ap.password[0] = '\0';  
+        } else {
+            strcpy((char *)wifi_config.ap.password, CONFIG_SIMPLE_OTA_AP_PASSWORD);
+            wifi_config.ap.authmode = WIFI_AUTH_WPA_WPA2_PSK;
+        }
+    } else {
+        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+        wifi_config.ap.password[0] = '\0';
     }
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
@@ -181,13 +191,6 @@ void apUpdate_wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t e
                  event->mac[0], event->mac[1], event->mac[2], event->mac[3], event->mac[4], event->mac[5]);
     }
 }
-
-extern const uint8_t index_html_start[] asm("_binary_index_html_start");
-extern const uint8_t index_html_end[] asm("_binary_index_html_end");
-extern const uint8_t main_css_start[] asm("_binary_main_css_start");
-extern const uint8_t main_css_end[] asm("_binary_main_css_end");
-extern const uint8_t main_js_start[] asm("_binary_main_js_start");
-extern const uint8_t main_js_end[] asm("_binary_main_js_end");
 
 // GET handler to serve the HTML page
 esp_err_t get_handler(httpd_req_t *req)

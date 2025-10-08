@@ -11,7 +11,10 @@ menu "Simple OTA Configuration"
         default "simpleota"
         help
             Password for the OTA access point. Must be at least 8 characters
-            for WPA2 security. Leave empty for open network (not recommended).
+            for WPA2 security, or leave empty for open network (not recommended).
+            
+            If password is 1-7 characters, it will be ignored and an open 
+            network will be created instead, as WPA2 requires minimum 8 characters.
 
     config SIMPLE_OTA_HOSTNAME
         string "mDNS Hostname"

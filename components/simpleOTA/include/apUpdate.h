@@ -18,6 +18,13 @@
 #define OTA_FIRMWARE_UPLOADED 3
 #define OTA_FIRMWARE_DONE 4
 
+extern const uint8_t index_html_start[] asm("_binary_index_html_start");
+extern const uint8_t index_html_end[] asm("_binary_index_html_end");
+extern const uint8_t main_css_start[] asm("_binary_main_css_start");
+extern const uint8_t main_css_end[] asm("_binary_main_css_end");
+extern const uint8_t main_js_start[] asm("_binary_main_js_start");
+extern const uint8_t main_js_end[] asm("_binary_main_js_end");
+
 void apUpdate_startAP(char *networkName);
 void apUpdate_task(void *pvParameters);
 void apUpdate_wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
