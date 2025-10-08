@@ -19,19 +19,24 @@ static esp_event_handler_instance_t wifi_event_handler_instance = NULL;
 static TaskHandle_t timeout_task_handle = NULL;
 static bool ap_timeout_active = false;
 
-#define AP_TIMEOUT_MINUTES 30
-#define AP_TIMEOUT_MS (AP_TIMEOUT_MINUTES * 60 * 1000)
+#define AP_TIMEOUT_MS (CONFIG_SIMPLE_OTA_TIMEOUT_MINUTES * 60 * 1000)
 
 // Handle AP timeout
 static void ap_timeout_task(void *pvParameters)
 {
-    ESP_LOGI("AP_TIMEOUT", "AP timeout task started. Will shutdown AP in %d minutes", AP_TIMEOUT_MINUTES);
+    if (CONFIG_SIMPLE_OTA_TIMEOUT_MINUTES == 0) {
+      ESP_LOGI("AP_TIMEOUT", "AP timeout disabled (0 minutes set in config). AP will run indefinitely until stopped manually.");
+      vTaskDelete(NULL);
+      return;
+    }
+
+    ESP_LOGI("AP_TIMEOUT", "AP timeout task started. Will shutdown AP in %d minutes", CONFIG_SIMPLE_OTA_TIMEOUT_MINUTES);
 
     vTaskDelay(pdMS_TO_TICKS(AP_TIMEOUT_MS));
 
     if (ap_timeout_active)
     {
-        ESP_LOGW("AP_TIMEOUT", "AP timeout reached (%d minutes). Automatically shutting down AP update mode", AP_TIMEOUT_MINUTES);
+        ESP_LOGW("AP_TIMEOUT", "AP timeout reached (%d minutes). Automatically shutting down AP update mode", CONFIG_SIMPLE_OTA_TIMEOUT_MINUTES);
         apUpdate_stop();
         ap_timeout_active = false;
         timeout_task_handle = NULL;
@@ -58,7 +63,7 @@ void apUpdate_task(void *pvParameters)
 
     if (xReturned == pdPASS)
     {
-        ESP_LOGI("AP_TIMEOUT", "Timeout task created successfully. AP will auto-shutdown in %d minutes", AP_TIMEOUT_MINUTES);
+        ESP_LOGI("AP_TIMEOUT", "Timeout task created successfully. AP will auto-shutdown in %d minutes", CONFIG_SIMPLE_OTA_TIMEOUT_MINUTES);
     }
     else
     {
