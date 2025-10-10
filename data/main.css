@@ -28,30 +28,21 @@ body {
 }
 
 .logo {
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(135deg, #4285f4 0%, #1976d2 100%);
-  border-radius: 50%;
-  margin: 0 auto 20px;
+  margin: 0 auto 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  box-shadow: 0 4px 15px rgba(66, 133, 244, 0.3);
 }
 
-.logo svg {
-  width: 28px;
-  height: 28px;
-  stroke: currentColor;
+.logo-image {
+  max-width: 200px;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
-h1 {
-  color: #495057;
-  margin-bottom: 30px;
-  font-size: 24px;
-  font-weight: 600;
-}
+
 
 .form-group {
   margin-bottom: 20px;
