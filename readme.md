@@ -6,6 +6,18 @@
 
 A simple Over-The-Air (OTA) firmware update solution for ESP32 devices. This project provides a complete web-based interface for uploading firmware updates wirelessly via an ESP32 access point.
 
+## Usage
+
+1. **Flash and run** the firmware on your ESP32 device
+2. **Connect** to the WiFi access point created by the device (default: `Simple OTA`)
+3. **Access the web interface** via browser:
+   - `http://simple-ota.local` (mDNS hostname)
+   - `http://10.0.0.1` (direct IP address)
+4. **Upload firmware** by dragging a `.bin` file to the interface or clicking to browse
+5. **Wait for completion** - the device will automatically validate and reboot
+
+The web interface provides drag-and-drop file upload, real-time progress tracking, and automatic firmware validation with rollback protection.
+
 ## Configuration
 
 Configure the OTA service using `idf.py menuconfig` → **Simple OTA Configuration**:
@@ -18,6 +30,8 @@ Configure the OTA service using `idf.py menuconfig` → **Simple OTA Configurati
 | Auto-shutdown Timeout | `0` (disabled) | Minutes before auto-shutdown (0 = no timeout) |
 | Auto-reboot | `Yes` | Reboot after successful update |
 | Max File Size | `2 MB` | Maximum firmware file size |
+
+**Partition Requirements**: OTA functionality requires dual app partitions. Ensure your partition table includes `ota_0` and `ota_1` partitions. Use `idf.py menuconfig` → **Partition Table** → **Default 2MB two OTA** or configure a custom partition table.
 
 
 ## Core Functions
