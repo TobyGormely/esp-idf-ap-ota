@@ -31,6 +31,22 @@ Configure the OTA service using `idf.py menuconfig` → **Simple OTA Configurati
 | Auto-reboot | `Yes` | Reboot after successful update |
 | Max File Size | `2 MB` | Maximum firmware file size |
 
+### Web Interface Customisation
+
+Personalise the OTA web interface through **Simple OTA Configuration** → **Web Page Customisation**:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Web Page Title | `Simple OTA` | Browser title and main heading |
+| Web Page Footer | `Created By Toby Gormely` | Footer text displayed in interface |
+| Primary Colour | `0x007bff` | Main Colour for buttons and progress bars |
+| Secondary Colour | `0x6c757d` | Border and text colors |
+| Background Colour | `0xf8f9fa` | Page and component backgrounds |
+
+**Colour Format**: Use hexadecimal values (e.g., `0xff5722` for orange, `0x4caf50` for green). Colors automatically adapt across the interface while maintaining accessibility and visual consistency.
+
+**Logo Customisation**: Replace the default logo by updating `data/logo.png` with your own image. 
+
 **Partition Requirements**: OTA functionality requires dual app partitions. Ensure your partition table includes `ota_0` and `ota_1` partitions. Use `idf.py menuconfig` → **Partition Table** → **Default 2MB two OTA** or configure a custom partition table.
 
 
