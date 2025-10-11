@@ -20,6 +20,7 @@ A simple Over-The-Air (OTA) firmware update solution for ESP32 devices. This pro
 
 The web interface provides drag-and-drop file upload, real-time progress tracking, and automatic firmware validation with rollback protection.
 
+![ESP32 Simple OTA](pageScreenshot.png)
 ## Configuration
 
 Configure the OTA service using `idf.py menuconfig` → **Simple OTA Configuration**:
