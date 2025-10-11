@@ -58,6 +58,13 @@ function showStatus(msg, type = '') {
   const statusElem = document.getElementById('status');
   statusElem.innerHTML = msg;
   statusElem.className = 'status' + (type ? ' ' + type : '');
+  
+  // Show status element when there's a message
+  if (msg && msg.trim() !== '') {
+    statusElem.style.display = 'block';
+  } else {
+    statusElem.style.display = 'none';
+  }
 }
 
 function getDetailedErrorMessage(status, responseText) {
@@ -94,35 +101,33 @@ function getDetailedErrorMessage(status, responseText) {
   }
 }
 
-
-
 function validateFile(file) {
   const errors = [];
   
-  // Check file existence
+  // existence
   if (!file) {
     errors.push('No file selected');
     return errors;
   }
   
-  // Check file extension
+  // extension
   if (!file.name.toLowerCase().endsWith('.bin')) {
     errors.push('File must have .bin extension');
   }
   
-  // Check file size (use configured limit)
+  // size
   const maxSizeBytes = (typeof CONFIG_MAX_FILE_SIZE_MB !== 'undefined' ? CONFIG_MAX_FILE_SIZE_MB : 2) * 1024 * 1024;
   if (file.size > maxSizeBytes) {
     const maxSizeMB = Math.floor(maxSizeBytes / (1024 * 1024));
     errors.push('File too large (maximum ' + maxSizeMB + 'MB)');
   }
   
-  // Check minimum size 
+  // minimum size 
   if (file.size < 100 * 1024) {
     errors.push('File too small (minimum 100KB) - not valid firmware');
   }
   
-  // Check file is not empty
+  // file not empty
   if (file.size === 0) {
     errors.push('File is empty');
   }
@@ -160,11 +165,13 @@ function uploadFirmware(event) {
     return;
   }
   
-  submitButton.disabled = true;
+  // Hide upload button and show progress bar
+  submitButton.style.display = 'none';
   progressContainer.style.display = 'block';
   progressFill.style.width = '0%';
   
-  showStatus('<span class="spinner"></span>Uploading firmware...');
+  const progressText = document.getElementById('progressText');
+  progressText.textContent = 'Uploading firmware...';
   
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/ota_update', true);
@@ -175,11 +182,7 @@ function uploadFirmware(event) {
       const percentComplete = (event.loaded / event.total) * 100;
       progressFill.style.width = percentComplete + '%';
       const speed = (event.loaded / 1024).toFixed(1);
-      showStatus(
-        '<span class="spinner"></span>Uploading... ' + 
-        percentComplete.toFixed(1) + '% (' + speed + ' KB)',
-        'uploading'
-      );
+      progressText.textContent = 'Uploading... ' + percentComplete.toFixed(1) + '% (' + speed + ' KB)';
     }
   };
   
@@ -189,21 +192,26 @@ function uploadFirmware(event) {
       'Network error occurred during upload',
       'error'
     );
+    // Reset to upload button on error
     submitButton.disabled = false;
+    submitButton.style.display = 'block';
     progressContainer.style.display = 'none';
     console.error('XHR Network error during OTA upload');
   };
   
   xhr.onreadystatechange = function() {
     if (xhr.readyState === 4) {
-      progressContainer.style.display = 'none';
       
       if (xhr.status === 200) {
-        // Success - handle restart countdown
+        // Success - show in progress bar
+        progressFill.style.width = '100%';
+        progressText.textContent = 'Update successful! Restarting system...';
         showStatus('<span class="spinner"></span>Update successful! Restarting system...', 'success');
+        
         let countdown = 15;
         const restartInterval = setInterval(function() {
           if (countdown > 0) {
+            progressText.textContent = 'Restarting in ' + countdown + ' seconds...';
             showStatus(
               '<span class="spinner"></span>Update successful! System restarting in ' + countdown + ' seconds...<br><small>Please wait for the device to restart</small>',
               'success'
@@ -212,6 +220,7 @@ function uploadFirmware(event) {
           } else {
             clearInterval(restartInterval);
             document.title = 'Update Complete - System Restarted';
+            progressText.textContent = 'Update Complete!';
             showStatus(
               '<strong>Firmware update completed successfully!</strong><br>' +
               'The system has restarted with the new firmware.<br>' +
@@ -223,11 +232,15 @@ function uploadFirmware(event) {
         }, 1000);
         
       } else {
-        // Error handling
+        // Error handling - reset to upload button
         const errorMsg = getDetailedErrorMessage(xhr.status, xhr.responseText);
         showStatus('<strong>Upload Failed</strong><br>' + errorMsg, 'error');
         
-        // Log error for debugging
+        // Reset UI to upload button
+        submitButton.disabled = false;
+        submitButton.style.display = 'block';
+        progressContainer.style.display = 'none';
+        
         console.error('OTA Upload failed:', {
           status: xhr.status,
           statusText: xhr.statusText,
@@ -235,8 +248,6 @@ function uploadFirmware(event) {
           file: file ? file.name : 'unknown'
         });
       }
-      
-      submitButton.disabled = false;
     }
   };
   

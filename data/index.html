@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Update Firmware</title>
+  <title>{{PAGE_TITLE}}</title>
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
@@ -24,14 +24,15 @@
     <form id="uploadForm" onsubmit="uploadFirmware(event)">
       <button type="submit" class="btn-primary" id="uploadButton" disabled>Upload Firmware</button>
     </form>
-    <div class="progress-container">
+    <div class="progress-container" id="progressContainer">
       <div class="progress-bar">
-        <div class="progress-fill"></div>
+        <div class="progress-fill" id="progressFill"></div>
+        <div class="progress-text" id="progressText">Upload Firmware</div>
       </div>
     </div>
     <div id="status" class="status"></div>
     <div class="footer">
-      <p>Created by Toby Gormely</p>
+      <p>{{PAGE_FOOTER}}</p>
     </div>
   </div>
   <script src="main.js"></script>
