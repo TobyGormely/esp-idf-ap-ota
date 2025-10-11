@@ -5,8 +5,10 @@
 #include "esp_err.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "sdkconfig.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 // External binary data declarations
 extern const uint8_t index_html_start[] asm("_binary_index_html_start");
@@ -211,16 +213,62 @@ void apUpdate_wifiEventHandler(void *arg, esp_event_base_t event_base, int32_t e
 esp_err_t get_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
+    
+    // Create a mutable copy of the HTML to perform replacements
     const size_t html_size = index_html_end - index_html_start;
-    httpd_resp_send(req, (const char *)index_html_start, html_size);
+    char* html_content = malloc(html_size + 1024); // Extra space for replacements
+    if (!html_content) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    
+    memcpy(html_content, index_html_start, html_size);
+    html_content[html_size] = '\0';
+    
+    // Replace title placeholder
+    char* title_pos = strstr(html_content, "{{PAGE_TITLE}}");
+    if (title_pos) {
+        size_t title_len = strlen(CONFIG_SIMPLE_OTA_WEB_PAGE_TITLE);
+        memmove(title_pos + title_len, title_pos + 14, strlen(title_pos + 14) + 1);
+        memcpy(title_pos, CONFIG_SIMPLE_OTA_WEB_PAGE_TITLE, title_len);
+    }
+    
+    // Replace footer placeholder
+    char* footer_pos = strstr(html_content, "{{PAGE_FOOTER}}");
+    if (footer_pos) {
+        size_t footer_len = strlen(CONFIG_SIMPLE_OTA_WEB_PAGE_FOOTER);
+        memmove(footer_pos + footer_len, footer_pos + 15, strlen(footer_pos + 15) + 1);
+        memcpy(footer_pos, CONFIG_SIMPLE_OTA_WEB_PAGE_FOOTER, footer_len);
+    }
+    
+    httpd_resp_send(req, html_content, strlen(html_content));
+    free(html_content);
     return ESP_OK;
 }
 
 esp_err_t css_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/css");
+    
+    // First send the dynamic colour variables
+    char color_css[512];
+    snprintf(color_css, sizeof(color_css), 
+             ":root {\n"
+             "  --primary-colour: #%06x;\n"
+             "  --secondary-colour: #%06x;\n"
+             "  --background-colour: #%06x;\n"
+             "}\n", 
+             CONFIG_SIMPLE_OTA_WEB_PAGE_PRIMARY_COLOUR & 0xFFFFFF,
+             CONFIG_SIMPLE_OTA_WEB_PAGE_SECONDARY_COLOUR & 0xFFFFFF,
+             CONFIG_SIMPLE_OTA_WEB_PAGE_BACKGROUND_COLOUR & 0xFFFFFF);
+    httpd_resp_send_chunk(req, color_css, strlen(color_css));
+    
+    // Then send the main CSS file
     const size_t css_size = main_css_end - main_css_start;
-    httpd_resp_send(req, (const char *)main_css_start, css_size);
+    httpd_resp_send_chunk(req, (const char *)main_css_start, css_size);
+    
+    // End the chunked response
+    httpd_resp_send_chunk(req, NULL, 0);
     return ESP_OK;
 }
 
@@ -228,11 +276,15 @@ esp_err_t js_handler(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "application/javascript");
     
-    // First send the configuration variable
-    char config_js[128];
+    // First send the configuration variables
+    char config_js[512];
     snprintf(config_js, sizeof(config_js), 
-             "const CONFIG_MAX_FILE_SIZE_MB = %d;\n", 
-             CONFIG_SIMPLE_OTA_MAX_FILE_SIZE_MB);
+             "const CONFIG_MAX_FILE_SIZE_MB = %d;\n"
+             "const CONFIG_AUTO_REBOOT = %s;\n"
+             "const CONFIG_TIMEOUT_MINUTES = %d;\n", 
+             CONFIG_SIMPLE_OTA_MAX_FILE_SIZE_MB,
+             CONFIG_SIMPLE_OTA_AUTO_REBOOT ? "true" : "false",
+             CONFIG_SIMPLE_OTA_TIMEOUT_MINUTES);
     httpd_resp_send_chunk(req, config_js, strlen(config_js));
     
     // Then send the main JavaScript file

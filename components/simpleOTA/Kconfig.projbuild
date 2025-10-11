@@ -1,4 +1,6 @@
 menu "Simple OTA Configuration"
+
+    menu  "Simple OTA Settings"
     config SIMPLE_OTA_AP_SSID
         string "Access Point SSID"
         default "Simple OTA"
@@ -45,4 +47,40 @@ menu "Simple OTA Configuration"
         help
             Maximum size of firmware files that can be uploaded.
             Larger files will be rejected to prevent memory issues.
+    endmenu 
+
+    menu "Web Page Customisation"
+    config SIMPLE_OTA_WEB_PAGE_TITLE
+        string "Web Page Title"
+        default "Simple OTA"
+        help
+            Title for the web page served by the OTA access point.
+
+    config SIMPLE_OTA_WEB_PAGE_FOOTER
+        string "Web Page Footer"
+        default "Created By Toby Gormely"
+        help
+            Footer text for the web page served by the OTA access point.
+
+    config SIMPLE_OTA_WEB_PAGE_PRIMARY_COLOUR
+        hex "Web Page Primary Colour"
+        default 0x17243f
+        help
+            Primary colour for the web page (in hex, e.g., 0x17243f for dark blue).
+            Used for headers and buttons.
+
+    config SIMPLE_OTA_WEB_PAGE_SECONDARY_COLOUR
+        hex "Web Page Secondary Colour"
+        default 0x6c757d
+        help
+            Secondary colour for the web page (in hex, e.g., 0x6c757d for grey).
+            Used for borders and dividers.
+
+    config SIMPLE_OTA_WEB_PAGE_BACKGROUND_COLOUR
+        hex "Web Page Background Colour"
+        default 0xf8f9fa
+        help
+            Background colour for the web page (in hex, e.g., 0xf8f9fa for light grey).
+    endmenu
+
 endmenu

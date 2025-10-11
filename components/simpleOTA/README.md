@@ -45,7 +45,7 @@ void app_main(void) {
 
 ### 3. Configure (optional)
 
-Run `idf.py menuconfig` → **Simple OTA Configuration** to customize:
+Run `idf.py menuconfig` → **Simple OTA Configuration** to customise:
 - WiFi AP name and password
 - mDNS hostname  
 - Timeout settings

@@ -135,3 +135,4 @@ esp_err_t simpleOTA_validateOnBoot(void)
     otaHandler_validateUpdate();
     return ESP_OK;
 }
+
