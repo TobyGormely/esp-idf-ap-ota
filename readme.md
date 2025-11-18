@@ -4,8 +4,6 @@
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.x-blue.svg)](https://github.com/espressif/esp-idf)
 [![Platform](https://img.shields.io/badge/platform-ESP32-lightgrey.svg)](https://www.espressif.com/en/products/socs/esp32)
 
-![ESP32 Simple OTA](SimpleOTA_large.png)
-
 A simple Over-The-Air (OTA) firmware update solution for ESP32 devices. This project provides a complete web-based interface for uploading firmware updates wirelessly via an ESP32 access point.
 
 ## Usage
